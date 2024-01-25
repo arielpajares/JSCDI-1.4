@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html encode="UTF-8">
+<canvas id="Rin's world" style="background-color:black;"></canvas>
+<script>
+canvas = document.getElementById("Rin's world");
+canvas.width=800;
+canvas.height=600;
+wed = canvas.getContext("2d");
+obj_list = [];
+stop = false;
+jsload=document.createElement('script');
+loadjsfile();
+
+function WObject(position,size,velocity,color){
+    this.x = position[0];
+    this.y = position[1];
+    this.color = color;
+    this.vx = velocity[0];
+    this.vy = velocity[1];
+    this.width = size[0];
+    this.height = size[1];
+    this.draw = function(){
+        wed.fillStyle = this.color;
+        wed.fillRect(this.x,this.y,this.width,this.height);
+    }
+    this.move = function(){
+        this.x += this.vx;
+        this.y += this.vy;
+    }
+    this.wallsCollide = function(){
+        if (this.x>=canvas.width-this.width){
+            this.vx *= -1;
+            this.x = canvas.width-this.width;
+        }
+        if (this.x<=0){
+            this.vx *= -1;
+            this.x = 0;
+        }
+        if (this.y>=canvas.height-this.height){
+            this.vy *= -1;
+            this.y = canvas.height-this.height;
+        }
+        if (this.y<=0){
+            this.vy *= -1;
+            this.y = 0;
+        }
+    }
+}
+
+function loadjsvar(){
+for (let i=0;i<screen.length;i++){
+temp_obj = new WObject([screen[i][0],screen[i][1]],[screen[i][2],screen[i][3]],[2,2],'rgba('+screen[i][4]+','+screen[i][5]+','+screen[i][6]+','+screen[i][7]+')');
+obj_list.push(temp_obj);
+}
+}
+
+function loadjsfile(){
+jsload.remove();
+jsload=document.createElement('script');
+jsload.setAttribute("src", "xor.js");
+document.body.appendChild(jsload);
+jsload.onload = () => {
+    loadjsvar();
+};
+console.log("Hola");
+}
+
+function gameLoop(){
+    wed.clearRect(0,0,canvas.width,canvas.height);
+for (let i=0;i<obj_list.length;i++){
+    
+    obj_list[i].draw();
+    obj_list[i].wallsCollide();
+    obj_list[i].move();
+}
+
+requestAnimationFrame(gameLoop);
+}
+gameLoop();
+
+</script>
+<button onclick="loadjsfile()">Load Design File</button>
+
+</html>
