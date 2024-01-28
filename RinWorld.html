@@ -58,7 +58,7 @@ obj_list.push(temp_obj);
 function loadjsfile(){
 jsload.remove();
 jsload=document.createElement('script');
-jsload.setAttribute("src", "xor.js");
+jsload.setAttribute("src", "decoded-input.js");
 document.body.appendChild(jsload);
 jsload.onload = () => {
     loadjsvar();
@@ -81,5 +81,4 @@ gameLoop();
 
 </script>
 <button onclick="loadjsfile()">Load Design File</button>
-
 </html>
