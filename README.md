@@ -1,2 +1,2 @@
-# JSCDI-1.0
+# JSCDI-1.2
 JavaScriptCanvasDesignImporter
