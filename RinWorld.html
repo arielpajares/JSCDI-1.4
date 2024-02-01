@@ -9,8 +9,9 @@ canvas.height=600;
 wed = canvas.getContext("2d");
 obj_list = [];
 stop = false;
+jsloadfile=document.createElement('script');
 jsload=document.createElement('script');
-loadjsfile();
+send_server_request_file("decoded-input.js");
 
 function WObject(position,size,velocity,color){
     this.x = position[0];
@@ -48,6 +49,29 @@ function WObject(position,size,velocity,color){
     }
 }
 
+function is_local(input) {
+    var temp_string = "";
+    var temp_string2 = "";
+    var local = false;
+    var stop = false;
+    for (let i=0;i<input.length;i++) {
+        if (input[i] == ',') {stop=true;}
+        if (stop == true){temp_string2 += input[i];}
+        if (stop != true){temp_string += input[i];}
+        if (temp_string == "local:") {
+            local = true;
+            temp_string = "";
+        }
+    }
+    console.log([true,temp_string,temp_string2,input])
+    if (local==true){
+        var output = document.getElementById(temp_string);
+        output = "["+output.value+"]";
+        return [true,output,temp_string2];
+    }
+    else{return false;}
+}
+
 function loadjsvar(){
 for (let i=0;i<screen.length;i++){
 temp_obj = new WObject([screen[i][0],screen[i][1]],[screen[i][2],screen[i][3]],[2,2],'rgba('+screen[i][4]+','+screen[i][5]+','+screen[i][6]+','+screen[i][7]+')');
@@ -55,15 +79,24 @@ obj_list.push(temp_obj);
 }
 }
 
-function loadjsfile(){
-jsload.remove();
-jsload=document.createElement('script');
-jsload.setAttribute("src", "decoded-input.js");
-document.body.appendChild(jsload);
-jsload.onload = () => {
+function send_server_request_file(request){
+jsloadfile.remove();
+jsloadfile=document.createElement('script');
+jsloadfile.setAttribute("src", request);
+document.body.appendChild(jsloadfile);
+jsloadfile.onload = () => {
     loadjsvar();
 };
-console.log("Hola");
+}
+
+function send_server_request(request,body){
+var local_info = is_local(body);
+if (local_info[0] == true) {var body_content = local_info[1]+local_info[2];}
+else {var body_content = body;}
+var stream = fetch(request, {
+    method: "POST",
+    body: body_content
+});
 }
 
 function gameLoop(){
@@ -80,5 +113,8 @@ requestAnimationFrame(gameLoop);
 gameLoop();
 
 </script>
-<button onclick="loadjsfile()">Load Design File</button>
+<button onclick="send_server_request_file('decoded-input.js')">Load Design File</button>
+<button onclick='send_server_request("character-decoder()","encoded-input.txt,decoded-input.js,")'>Decode input</button>
+<button onclick='send_server_request("decode-from-web-input()","local:encoded-web-input,decoded-input.js,")'>Save Changes</button>
+<textarea type="text" id="encoded-web-input"></textarea>
 </html>
