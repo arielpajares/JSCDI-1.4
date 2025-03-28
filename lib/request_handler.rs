@@ -1,5 +1,7 @@
 use std::fs::File;
-use std::io::{Read,Write};
+use std::sync::{Arc, Mutex, mpsc};
+use std::io::{Read, Write, BufRead, BufReader};
+use std::process::{Command, Stdio};
 use decoder;
 
 fn subtract_char(x:&String,y:char) -> String{
@@ -117,6 +119,31 @@ fn execute_instruction(instruction:&String,parameters:&Vec<String>) {
     
 }
 
+fn execute_php(file: &String) -> String {
+    let mut output = String::new();
+    let mut aux_line = String::new();
+    let mut contador = 0;
+    let (tx, rx) = mpsc::channel();
+    let mut test = Command::new("C:/xampp/php/php").arg("-f").arg(file).stdout(Stdio::piped()).spawn().unwrap();
+    let mut test_output = test.stdout.take().unwrap();
+    let mut pre_output = BufReader::new(test_output);
+
+    for line in pre_output.lines() {
+        contador = contador+1;
+        let tx_clone = tx.clone();
+        match line {
+            Ok(output) => {tx_clone.send(output+&"\n".to_string());},
+            Err(_) => {}
+        }
+    }
+    for line in 0..contador {
+        aux_line = rx.recv().unwrap();
+        output += &aux_line;
+    }
+
+    output
+}
+
 pub fn handle_request(s1:&String) -> String {
     let mut parameters = Vec::new();
     let mut function_a = String::new();
@@ -134,17 +161,11 @@ pub fn handle_request(s1:&String) -> String {
     else {
         file_directory = read_between_chars(&line,'/',' ');
         if file_directory == "" {
-            requested_file = File::open("RinWorld.html").unwrap();
-            requested_file.read_to_string(&mut file_content);
+            file_content = execute_php(&"www/RinWorld.html".to_string());
         }else {
-            requested_file = File::open(&file_directory).unwrap();
-            requested_file.read_to_string(&mut file_content);
+            file_content = execute_php(&("www/".to_string()+&file_directory));
         }
         response = format!("HTTP/1.1 200 OK\nContent-Length:{}\n\n{}",file_content.len(),file_content);
     }
     response
-}
-
-fn main() {
-    handle_request(&"POST /xor() HTTP/1.1\n\rHost: 127.0.0.1\n\rConnection: keep-alive\n\r\n\r[gola,Formal],fojd,".to_string());
 }
