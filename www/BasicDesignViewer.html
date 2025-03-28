@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html encode="UTF-8">
+<canvas id="Rin's world" style="background-color:black;"></canvas>
+<script src="decoded-input.js"></script>
+<script>
+canvas = document.getElementById("Rin's world");
+canvas.width=800;
+canvas.height=600;
+wed = canvas.getContext("2d");
+
+for (let i=0;i<screen.length;i++){
+wed.fillStyle = 'rgba('+screen[i][4]+','+screen[i][5]+','+screen[i][6]+','+screen[i][7]+')';
+wed.fillRect(screen[i][0],screen[i][1],screen[i][2],screen[i][3]);
+}
+
+</script>
+</html>
