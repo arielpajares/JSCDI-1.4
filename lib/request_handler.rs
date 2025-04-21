@@ -2,6 +2,7 @@ use std::fs::File;
 use std::sync::{Arc, Mutex, mpsc};
 use std::io::{Read, Write, BufRead, BufReader};
 use std::process::{Command, Stdio};
+use obj;
 use decoder;
 
 fn subtract_char(x:&String,y:char) -> String{
@@ -110,13 +111,17 @@ fn is_function(input:&String) -> bool {
     output
 }
 
-fn execute_instruction(instruction:&String,parameters:&Vec<String>) {
+fn execute_instruction(instruction:&String, parameters:&Vec<String>) -> String {
+    let mut output = String::new();
     let mut instructions_list = Vec::new();
-    instructions_list.push("character-decoder()".to_string());
-    instructions_list.push("decode-from-web-input()".to_string());
-    if instruction == &instructions_list[0].to_string() {decoder::decode_txt_file(&parameters[0].to_string(),&parameters[1].to_string());}
-    if instruction == &instructions_list[1].to_string() {decoder::decode_string_input(&parameters[0].to_string(),&parameters[1].to_string());}
+    instructions_list.push(String::from("character-decoder()"));
+    instructions_list.push(String::from("decode-from-web-input()"));
+    instructions_list.push(String::from("getObjTriangles()"));
+    if instruction == &instructions_list[0] {decoder::decode_txt_file(&parameters[0],&parameters[1]);}
+    if instruction == &instructions_list[1] {decoder::decode_string_input(&parameters[0],&parameters[1]);}
+    if instruction == &instructions_list[2] {let triangles = obj::getObjTriangles(&parameters[0]); let trianglesLen = format!("{:?}", triangles).len(); output = format!("\nContent-Length:{}\n\n{:?}", trianglesLen, triangles); }
     
+    output
 }
 
 fn execute_php(file: &String) -> String {
@@ -155,8 +160,8 @@ pub fn handle_request(s1:&String) -> String {
     if is_function(&line) == true {
         parameters = especial_split_string(&get_body_request_line(s1),',');
         function_a = read_between_chars(&line,'/',' ');
-        execute_instruction(&function_a,&parameters);
-        response = format!("HTTP/1.1 200 OK");
+        let output = execute_instruction(&function_a,&parameters);
+        response = format!("HTTP/1.1 200 OK{output}");
     }
     else {
         file_directory = read_between_chars(&line,'/',' ');
