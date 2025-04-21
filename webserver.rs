@@ -4,10 +4,11 @@ use std::io::Read;
 use std::io::Write;
 use std::io;
 use std::str;
+use std::env;
+use std::process;
 use std::fs::File;
 mod lib;
-use lib::request_handler;
-use lib::decoder;
+use lib::{request_handler, decoder, obj};
 
 fn client_requestes(mut request: TcpStream){
 println!("Conexion establecida!!!\nEscuchando al cliente...");
@@ -27,9 +28,14 @@ let mut reader = [0;1024];
 }
 
 fn main() {
-    let mut addr_input = String::new();
-    println!("Primero que todo, ingrese su direccion de ipv4 y el puerto en el que va a iniciar el servidor\nEjemplo: 127.0.0.1:8080\nAhora ingresa tu:");
-    io::stdin().read_line(&mut addr_input).unwrap();
+    let args: Vec<String> = env::args().collect();
+
+    if &args[1] == &"--help" {
+        println!("  | | | | JSCDI-1.4 | | | |   \n\nwebserver \"IP_ADDRESS\" \"PORT\"\n\nExample: webserver 127.0.0.1 80");
+        process::exit(0);
+    }
+
+    let addr_input = String::from(args[1].clone()+&":"+&args[2]);
     let mut listener = TcpListener::bind(&addr_input.trim()).unwrap();
 
     for client_request in listener.incoming() {
