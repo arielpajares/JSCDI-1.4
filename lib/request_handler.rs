@@ -117,10 +117,20 @@ fn execute_instruction(instruction:&String, parameters:&Vec<String>) -> String {
     instructions_list.push(String::from("character-decoder()"));
     instructions_list.push(String::from("decode-from-web-input()"));
     instructions_list.push(String::from("getObjTriangles()"));
+    instructions_list.push(String::from("getObjTriangles2D()"));
+    instructions_list.push(String::from("getObjVertices()"));
+    instructions_list.push(String::from("getObjVertices2D()"));
+    instructions_list.push(String::from("getObjIndices()"));
+    instructions_list.push(String::from("getObjModel()"));
     if instruction == &instructions_list[0] {decoder::decode_txt_file(&parameters[0],&parameters[1]);}
     if instruction == &instructions_list[1] {decoder::decode_string_input(&parameters[0],&parameters[1]);}
-    if instruction == &instructions_list[2] {let triangles = obj::getObjTriangles(&parameters[0]); let trianglesLen = format!("{:?}", triangles).len(); output = format!("\nContent-Length:{}\n\n{:?}", trianglesLen, triangles); }
-    
+    if instruction == &instructions_list[2] {let triangles = obj::getObjTriangles(&parameters[0], false); let trianglesLen = format!("{:?}", triangles).len(); output = format!("\nContent-Length:{}\n\n{:?}", trianglesLen, triangles); }
+    if instruction == &instructions_list[3] {let triangles = obj::getObjTriangles(&parameters[0], true); let trianglesLen = format!("{:?}", triangles).len(); output = format!("\nContent-Length:{}\n\n{:?}", trianglesLen, triangles); }
+    if instruction == &instructions_list[4] {let mut file = File::open(&parameters[0]).unwrap();let mut obj = String::new();file.read_to_string(&mut obj);let vertices = obj::getObjVertices(&obj); let verticesLen = format!("{:?}", vertices).len(); output = format!("\nContent-Length:{}\n\n{:?}", verticesLen, vertices); }
+    if instruction == &instructions_list[5] {let mut file = File::open(&parameters[0]).unwrap();let mut obj = String::new();file.read_to_string(&mut obj);let vertices = obj::getObjVertices2D(&obj); let verticesLen = format!("{:?}", vertices).len(); output = format!("\nContent-Length:{}\n\n{:?}", verticesLen, vertices);  }
+    if instruction == &instructions_list[6] {let mut file = File::open(&parameters[0]).unwrap();let mut obj = String::new();file.read_to_string(&mut obj);let indices = obj::getObjF(&obj); let indicesLen = format!("{:?}", indices).len(); output = format!("\nContent-Length:{}\n\n{:?}", indicesLen, indices); }
+    if instruction == &instructions_list[7] {let model = obj::getObjModel(&parameters[0]); let modelLen = format!("{:?}", model).len(); output = format!("\nContent-Length:{}\n\n{:?}", modelLen, model); }
+
     output
 }
 
@@ -149,28 +159,31 @@ fn execute_php(file: &String) -> String {
     output
 }
 
-pub fn handle_request(s1:&String) -> String {
+pub fn handle_request(s1:&String) -> Vec<u8> {
     let mut parameters = Vec::new();
     let mut function_a = String::new();
     let mut file_directory = String::new();
-    let mut file_content = String::new();
-    let mut response = String::new();
+    let mut file_content: Vec<u8> = Vec::new();
+    let mut response: Vec<u8> = Vec::new();
     let mut requested_file: File;
     let line = split_string(s1,'\n')[0].to_string();
     if is_function(&line) == true {
         parameters = especial_split_string(&get_body_request_line(s1),',');
         function_a = read_between_chars(&line,'/',' ');
         let output = execute_instruction(&function_a,&parameters);
-        response = format!("HTTP/1.1 200 OK{output}");
+        response = format!("HTTP/1.1 200 OK{output}").into_bytes();
     }
     else {
         file_directory = read_between_chars(&line,'/',' ');
         if file_directory == "" {
-            file_content = execute_php(&"www/RinWorld.html".to_string());
+            File::open("../../www/RinWorld.html").unwrap().read_to_end(&mut file_content);
+            //file_content = execute_php(&"www/RinWorld.html".to_string());
         }else {
-            file_content = execute_php(&("www/".to_string()+&file_directory));
+            File::open("../../www/".to_owned()+&file_directory).unwrap().read_to_end(&mut file_content);
+            //file_content = execute_php(&("www/".to_string()+&file_directory));
         }
-        response = format!("HTTP/1.1 200 OK\nContent-Length:{}\n\n{}",file_content.len(),file_content);
+        response = format!("HTTP/1.1 200 OK\nContent-Length:{}\n\n",file_content.len()).into_bytes();
+        response.extend(file_content);
     }
     response
 }
