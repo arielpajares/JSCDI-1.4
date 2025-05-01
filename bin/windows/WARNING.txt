@@ -1,0 +1,4 @@
+This is a windows binary of the JSCDI webserver rust file. Please BE ABSOLUTELY SURE before downloading executable files on the internet, even though I made this program myself,
+I suggest you DOWNLOAD RUST lang and compile It in your own device to be certain that is safe to use.
+
+Being that said, please enjoy!
