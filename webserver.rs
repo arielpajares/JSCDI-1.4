@@ -14,7 +14,7 @@ fn client_requestes(mut request: TcpStream){
 println!("Conexion establecida!!!\nEscuchando al cliente...");
 let mut request_content = String::new();
 let mut reader = [0;1024];
-let mut response = String::new();
+let mut response = Vec::<u8>::new();
 
 let bytes = match request.read(&mut reader) {Ok(x) => x,Err(d) => 0};
 if bytes != 0 {
@@ -22,7 +22,7 @@ if bytes != 0 {
     println!("Client's Request: {request_content}");
     response = request_handler::handle_request(&request_content);
     }
-request.write(response.as_bytes());
+request.write_all(response.as_slice());
 let mut reader = [0;1024];
     
 }
@@ -31,7 +31,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if &args[1] == &"--help" {
-        println!("  | | | | JSCDI-1.4 | | | |   \n\nwebserver \"IP_ADDRESS\" \"PORT\"\n\nExample: webserver 127.0.0.1 80");
+        println!("  | | | | JSCDI-1.5 | | | |   \n\nwebserver \"IP_ADDRESS\" \"PORT\"\n\nExample: webserver 127.0.0.1 80");
         process::exit(0);
     }
 
