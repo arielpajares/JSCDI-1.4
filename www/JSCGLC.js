@@ -91,9 +91,9 @@ class Matrix3D {
     }
 
     static lookAt(eye, center, up) {
-        const zAxis = this.normalize(this.subtract(eye, center)); // cámara hacia atrás
-        const xAxis = this.normalize(this.cross(up, zAxis));      // derecha
-        const yAxis = this.cross(zAxis, xAxis);                   // arriba
+        const zAxis = this.normalize(this.subtract(eye, center));
+        const xAxis = this.normalize(this.cross(up, zAxis));
+        const yAxis = this.cross(zAxis, xAxis);
     
         return new Float32Array([
             xAxis[0], yAxis[0], zAxis[0], 0,
@@ -181,19 +181,24 @@ class Object3D {
     vao;
     texture;
 
-    constructor (position, velocity, size, rotation, indices, vao, texture, matFromEyeWorldUniform, matWorldUniform, invertNormalsUniform, cameraViewUniform) {
+    constructor (position, velocity, size, rotation, indices, vao, texture, program, matFromEyeWorldUniform, matWorldUniform, invertNormalsUniform, cameraViewUniform, numPointLightsUniform) {
         this.position = position;
         this.velocity = velocity;
         this.indices = indices;
-        this.matFromEyeWorldUniform = matFromEyeWorldUniform;
-        this.matWorldUniform = matWorldUniform;
-        this.invertNormalsUniform = invertNormalsUniform;
-        this.cameraViewUniform = cameraViewUniform;
         this.size = size;
         this.rotation = rotation;
         Object3D.camera = [[0, 0, 0], [0, 0, 0]];
         this.vao = vao;
         this.texture = texture;
+
+        this.program = program;
+
+        // Shader uniforms
+        this.matFromEyeWorldUniform = matFromEyeWorldUniform;
+        this.matWorldUniform = matWorldUniform;
+        this.invertNormalsUniform = invertNormalsUniform;
+        this.cameraViewUniform = cameraViewUniform;
+        this.numPointLightsUniform = numPointLightsUniform;
     }
 
     update(dt) {
@@ -202,13 +207,24 @@ class Object3D {
         this.position[2] += this.velocity[2] * dt;
     }
 
-    draw(gl, inverted) {
+    draw(gl, inverted, pointLights) {
         let eye = Object3D.camera[0];
         let eyeRot = Object3D.camera[1];
         this.matFromEyeWorld = Matrix3D.matTRS(this.position[0]-eye[0], this.position[1]-eye[1], this.position[2]-eye[2], [eyeRot[0], eyeRot[1], eyeRot[2]], [this.rotation[0], this.rotation[1], this.rotation[2]], this.size[0], this.size[1], this.size[2]);
         this.matWorld = Matrix3D.matTRS(this.position[0], this.position[1], this.position[2], 0, [this.rotation[0], this.rotation[1], this.rotation[2]], this.size[0], this.size[1], this.size[2]);
         gl.uniform1f(this.invertNormalsUniform, inverted);
         gl.uniform3fv(this.cameraViewUniform, new Float32Array(eye));
+        gl.uniform1i(this.numPointLightsUniform, pointLights.length);
+        for (i = 0; i < pointLights.length; i++) {
+            let lightPointUniform = JSCGL.gl.getUniformLocation(this.program, "lightPoint["+i+"].position");
+            let lightDiffuseUniform = JSCGL.gl.getUniformLocation(this.program, "lightPoint["+i+"].diffuse");
+            let lightSpecularUniform = JSCGL.gl.getUniformLocation(this.program, "lightPoint["+i+"].specular");
+            let lightColorUniform = JSCGL.gl.getUniformLocation(this.program, "lightPoint["+i+"].color");
+            gl.uniform3fv(lightPointUniform, new Float32Array(pointLights[i].position));
+            gl.uniform3fv(lightColorUniform, new Float32Array(pointLights[i].color));
+            gl.uniform1f(lightDiffuseUniform, pointLights[i].diffuseStrength);
+            gl.uniform1f(lightSpecularUniform, pointLights[i].specularStrength);
+        }
         gl.uniformMatrix4fv(this.matWorldUniform, false, this.matWorld);
         gl.uniformMatrix4fv(this.matFromEyeWorldUniform, false, this.matFromEyeWorld);
 
@@ -298,13 +314,62 @@ class Model {
 
 class Scene {
     objects;
+    sceneData;
     invertedObjects;
     cameras;
+    pointLights;
 
-    constructor() {
+    constructor(scene) {
+        this.sceneData = scene;
         this.objects = [];
+        this.pointLights = [];
         this.cameras = [];
         this.invertedObjects = [];
+    }
+
+    async loadScene(gl) {
+        let tempImage = new Image();
+        let modelData = [];
+        let models = [];
+        let objects = [];
+        let pointLights = [];
+        let invertedObjects = [];
+        
+        for (let i = 0; i < this.sceneData.src.models.length; i++) {
+            let actualModel = this.sceneData.src.models[i];
+            tempImage = await this.loadImageAsync(this.sceneData.src.images[actualModel.image]);
+
+            modelData.push(new Model(await fetchModel(actualModel.model, tempImage)));
+        }
+        
+        for (let i = 0; i < modelData.length; i++) {
+            models.push(gl.loadModel(modelData[i]));
+        }
+
+        for (let i = 0; i < this.sceneData.data.objects.length; i++) {
+            let actualObject = this.sceneData.data.objects[i];
+            objects.push(gl.newObject(models[actualObject.model], actualObject.position, actualObject.scale, actualObject.velocity, actualObject.rotation));
+            invertedObjects.push(actualObject.inverted);
+        }
+
+        for (let i = 0; i < this.sceneData.data.pointLights.length; i++) {
+            let actualLight = this.sceneData.data.pointLights[i];
+            pointLights.push({"position": actualLight.position, "color": actualLight.color, "diffuseStrength": actualLight.diffuseStrength, "specularStrength": actualLight.diffuseStrength});
+        }
+
+        this.objects = objects;
+        this.invertedObjects = invertedObjects;
+        console.log(pointLights);
+        this.pointLights = pointLights;
+    }
+    
+    loadImageAsync(src) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+        });
     }
 
     returnScene(json) {
@@ -318,19 +383,19 @@ class Scene {
 
     draw(gl, dt) {
         let camera;
-        for (i = 0; i < this.cameras.length; i++) {
+        for (let i = 0; i < this.cameras.length; i++) {
             camera = this.cameras[i];
-            this.objects[i].update(dt);
             if (camera[2]) {
                 Object3D.setCamera(camera[0], camera[1]);
             }
         }
-        for (i = 0; i < this.objects.length; i++) {
+        for (let i = 0; i < this.objects.length; i++) {
+            this.objects[i].update(dt);
             if (this.invertedObjects[i] == true) {
-                this.objects[i].draw(gl, -1.0);
+                this.objects[i].draw(gl, -1.0, this.pointLights);
             }
             else {
-                this.objects[i].draw(gl, 1.0);
+                this.objects[i].draw(gl, 1.0, this.pointLights);
             }
             
         }
@@ -366,13 +431,39 @@ class Scene {
     shift() {
         this.objects.shift();
     }
+
+    async fetchModel(file, texture, indices) {
+        let response = await fetchPostResponse("getObjModel()", file);
+        let file_content = await response.text();
+        if (indices) {
+            return [new Float32Array(txtToArray(file_content)), texture, indices];
+        }
+        else {
+            return [new Float32Array(txtToArray(file_content)), texture];
+        }
+    }
+
+    async fetchPostResponse(func, file) {
+        while (true) {
+            try {
+                const response = await fetch(func, {
+                    method: "POST",
+                    body: file+","
+                });
+                if (response.ok) {
+                    return response;
+                }
+            } catch {}
+        }
+    }
 }
 
 class JSCGL {
     static gl;
     static matFromEyeWorldUniform;
     static matWorldUniform;
-    static lightPointUniform;
+    static lightColorUniform;
+    static numPointLightsUniform;
     static invertNormalsUniform;
     static cameraViewUniform;
 
@@ -386,8 +477,8 @@ class JSCGL {
             this.height = 600;
         }
 
-        this.width = width;
-        this.height = height;
+        this.width = 1325;
+        this.height = 613;
 
         console.log(this.width, this.height, 123)
 
@@ -397,28 +488,50 @@ precision mediump float;
 in vec3 vertPosition;
 in vec2 vertColor;
 in vec3 normal;
-out float diffuseLight;
-out float specularLight;
+out vec3 brightness;
 out vec2 uvCoords;
+
+struct PointLight {
+    vec3 position;
+    vec3 color;
+    float diffuse;
+    float specular;
+};
+
+vec3 pointLightCalculation(PointLight light, int numPointLights, vec3 finalNormal, mat3 matWorld, vec4 vertWorldPosition, vec3 cameraView) {
+        vec3 lightPoint = vec3(light.position[0], light.position[1], light.position[2]);
+        vec3 offset = lightPoint - vec3(vertWorldPosition[0], vertWorldPosition[1], vertWorldPosition[2]);
+        float distance = length(offset);
+        vec3 direction = normalize(offset);
+
+        float diffuseRed = max(0.0, dot(direction, normalize(mat3(matWorld) * finalNormal))) * light.color[0] * light.diffuse;
+        float diffuseGreen = max(0.0, dot(direction, normalize(mat3(matWorld) * finalNormal))) * light.color[1] * light.diffuse;
+        float diffuseBlue = max(0.0, dot(direction, normalize(mat3(matWorld) * finalNormal))) * light.color[2] * light.diffuse;
+        float attenuation = 1.0 / ( 0.0025 * distance * distance + 0.25);
+        float specularRed = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, finalNormal )))) ) ) * light.color[0] * light.specular;
+        float specularGreen = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, finalNormal )))) ) ) * light.color[1] * light.specular;
+        float specularBlue = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, finalNormal )))) ) ) * light.color[2] * light.specular;
+        vec3 diffuseLight = vec3(diffuseRed * attenuation, diffuseGreen * attenuation, diffuseBlue * attenuation);
+        vec3 specularLight = vec3(specularRed * attenuation, specularGreen * attenuation, specularBlue * attenuation);        
+        
+        return specularLight + diffuseLight;
+}
 
 uniform mat4 matWorld;
 uniform mat4 matFromEyeWorld;
 uniform mat4 matViewProj;
-uniform vec3 lightPoint;
+uniform int numPointLights;
+uniform PointLight lightPoint[8];
 uniform vec3 cameraView;
 uniform float invertNormals;
 
 void main() {
     vec3 finalNormal = vec3(normal[0] * invertNormals, normal[1] * invertNormals, normal[2] * invertNormals);
     vec4 vertWorldPosition = matWorld * vec4(vertPosition, 1.0);
-    vec3 offset = lightPoint - vec3(vertWorldPosition[0], vertWorldPosition[1], vertWorldPosition[2]);
-    float distance = length(offset);
-    vec3 direction = normalize(offset);
 
-    float diffuse = max(0.0, dot(direction, normalize(mat3(matWorld) * finalNormal)));
-    float attenuation = 1.0 / ( 0.0025 * distance * distance + 0.25);
-    specularLight = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, finalNormal )))) ) );
-    diffuseLight = diffuse * attenuation;
+    for (int i = 0; i < numPointLights; i++) {
+        brightness += pointLightCalculation(lightPoint[i], numPointLights, finalNormal, mat3(matWorld), vertWorldPosition, cameraView);
+    }
     uvCoords = vertColor;
     gl_Position = matViewProj * matFromEyeWorld * vec4(vertPosition, 1.0);
 }
@@ -427,8 +540,7 @@ void main() {
 precision mediump float;
 
 in vec2 uvCoords;
-in float diffuseLight;
-in float specularLight;
+in vec3 brightness;
 out vec4 color;
 
 uniform sampler2D uSampler;
@@ -440,9 +552,9 @@ void main() {
     float textureGreen = textureColor.g;
     float textureBlue = textureColor.b;
 
-    float red = (textureRed * 0.2) + (textureRed * diffuseLight * 0.4) + (specularLight * 0.4);
-    float green = (textureGreen * 0.2) + (textureGreen * diffuseLight * 0.4)  + (specularLight * 0.4);
-    float blue = (textureBlue * 0.2) + (textureBlue * diffuseLight * 0.4)  + (specularLight * 0.4);
+    float red = (textureRed * 0.2) + (textureRed * brightness[0]);
+    float green = (textureGreen * 0.2) + (textureGreen * brightness[1]);
+    float blue = (textureBlue * 0.2) + (textureBlue * brightness[2]);
     color = vec4(red, green, blue, 1.0);
 }`;
 
@@ -457,8 +569,8 @@ void main() {
         JSCGL.matWorldUniform = JSCGL.gl.getUniformLocation(this.program, "matWorld");
         JSCGL.matFromEyeWorldUniform = JSCGL.gl.getUniformLocation(this.program, "matFromEyeWorld");
         this.matViewProjUnifrom = JSCGL.gl.getUniformLocation(this.program, "matViewProj");
-        JSCGL.lightPointUniform = JSCGL.gl.getUniformLocation(this.program, "lightPoint");
         JSCGL.invertNormalsUniform = JSCGL.gl.getUniformLocation(this.program, "invertNormals");
+        JSCGL.numPointLightsUniform = JSCGL.gl.getUniformLocation(this.program, "numPointLights");
         JSCGL.cameraViewUniform = JSCGL.gl.getUniformLocation(this.program, "cameraView");
 
         this.matView = Matrix3D.lookAt(
@@ -680,18 +792,7 @@ void main() {
             rotation = shapeRotation;
         }
 
-        return new Object3D(position, velocity, size, rotation, shape[1], shape[0], shape[2], JSCGL.matFromEyeWorldUniform, JSCGL.matWorldUniform, JSCGL.invertNormalsUniform, JSCGL.cameraViewUniform);
-    }
-
-    newCamera(x, y, z, cameraRotation) {
-        let rotation = [0, 0, 0];
-        if (rotation) {rotation = cameraRotation}
-        return [[x, y, z], rotation];
-    }
-
-    // Para quitar
-    useCamera(camera) {
-        Object3D.setCamera(camera[0], camera[1]);
+        return new Object3D(position, velocity, size, rotation, shape[1], shape[0], shape[2], this.program, JSCGL.matFromEyeWorldUniform, JSCGL.matWorldUniform, JSCGL.invertNormalsUniform, JSCGL.cameraViewUniform, JSCGL.numPointLightsUniform);
     }
 
     static setLightPosition(x, y, z) {
@@ -712,17 +813,5 @@ void main() {
         );
         this.matViewProj = Matrix3D.multiplyMatrices(this.matProj, this.matView);
         JSCGL.gl.uniformMatrix4fv(this.matViewProjUnifrom, false, this.matViewProj);
-    }
-
-    getProgram() {
-        return this.program;
-    }
-
-    getPositionAttribLocation() {
-        return this.positionAttribLocation;
-    }
-    
-    getColorAttribLocation() {
-        return this.colorAttribLocation;
     }
 }
