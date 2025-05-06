@@ -279,7 +279,7 @@ pub fn getObjModel(fileAddr: &String) -> Vec<f32> {
         model.push(vertices[verticesF[i].parse::<usize>().unwrap()-1][2].parse::<f32>().unwrap());
 
         model.push(uvCoords[uvCoordsF[i].parse::<usize>().unwrap()-1][0].parse::<f32>().unwrap());
-        model.push(uvCoords[uvCoordsF[i].parse::<usize>().unwrap()-1][1].parse::<f32>().unwrap());
+        model.push(1.0 - uvCoords[uvCoordsF[i].parse::<usize>().unwrap()-1][1].parse::<f32>().unwrap());
 
         model.push(normals[normalsF[i].parse::<usize>().unwrap()-1][0].parse::<f32>().unwrap());
         model.push(normals[normalsF[i].parse::<usize>().unwrap()-1][1].parse::<f32>().unwrap());
