@@ -317,11 +317,13 @@ class Scene {
     sceneData;
     invertedObjects;
     cameras;
+    actualCamera;
     pointLights;
 
     constructor(scene) {
         this.sceneData = scene;
         this.objects = [];
+        this.actualCamera = "camera00"
         this.pointLights = [];
         this.cameras = [];
         this.invertedObjects = [];
@@ -334,6 +336,7 @@ class Scene {
         let objects = [];
         let pointLights = [];
         let invertedObjects = [];
+        let cameras = [];
         
         for (let i = 0; i < this.sceneData.src.models.length; i++) {
             let actualModel = this.sceneData.src.models[i];
@@ -354,12 +357,17 @@ class Scene {
 
         for (let i = 0; i < this.sceneData.data.pointLights.length; i++) {
             let actualLight = this.sceneData.data.pointLights[i];
-            pointLights.push({"position": actualLight.position, "color": actualLight.color, "diffuseStrength": actualLight.diffuseStrength, "specularStrength": actualLight.diffuseStrength});
+            pointLights.push({"id": actualLight.id, "position": actualLight.position, "color": actualLight.color, "diffuseStrength": actualLight.diffuseStrength, "specularStrength": actualLight.diffuseStrength});
+        }
+
+        for (let i = 0; i < this.sceneData.data.cameras.length; i++) {
+            let actualCamera = this.sceneData.data.cameras[i];
+            cameras.push({"id": actualCamera.id, "position": actualCamera.position, "rotation": actualCamera.rotation, "fov": actualCamera.fov, "active": actualCamera.active});
         }
 
         this.objects = objects;
         this.invertedObjects = invertedObjects;
-        console.log(pointLights);
+        this.cameras = cameras;
         this.pointLights = pointLights;
     }
     
@@ -381,14 +389,25 @@ class Scene {
         }
     }
 
-    draw(gl, dt) {
-        let camera;
+    draw(gl, dt, width, height) {
         for (let i = 0; i < this.cameras.length; i++) {
-            camera = this.cameras[i];
-            if (camera[2]) {
-                Object3D.setCamera(camera[0], camera[1]);
+            if (this.cameras[i].id == this.actualCamera) {
+                if (!this.cameras[i].active) {
+                    this.cameras[i].active = true;
+                    let matProj = Matrix3D.perspectiveMatrix(
+                        Matrix3D.convertToRad(this.cameras[i].fov),
+                        width / height,
+                        0.1, 1000.0
+                    );
+                    let matViewProj = Matrix3D.multiplyMatrices(matProj, JSCGL.matView);
+            
+                    gl.uniformMatrix4fv(JSCGL.matViewProjUnifrom, false, matViewProj);
+                    Object3D.setCamera(this.cameras[i].position, this.cameras[i].rotation);
+                    break;
+                }
             }
         }
+
         for (let i = 0; i < this.objects.length; i++) {
             this.objects[i].update(dt);
             if (this.invertedObjects[i] == true) {
@@ -462,25 +481,17 @@ class JSCGL {
     static gl;
     static matFromEyeWorldUniform;
     static matWorldUniform;
+    static matViewProjUnifrom
     static lightColorUniform;
     static numPointLightsUniform;
     static invertNormalsUniform;
     static cameraViewUniform;
 
+    static matView;
+
     // JSCGL Constructor
 
-    constructor(width, height) {
-        if (!width) {
-            this.width = 800;
-        }
-        if (!height) {
-            this.height = 600;
-        }
-
-        this.width = 1325;
-        this.height = 613;
-
-        console.log(this.width, this.height, 123)
+    constructor() {
 
         this.vertexShaderText = `#version 300 es
 precision mediump float;
@@ -508,9 +519,9 @@ vec3 pointLightCalculation(PointLight light, int numPointLights, vec3 finalNorma
         float diffuseGreen = max(0.0, dot(direction, normalize(mat3(matWorld) * finalNormal))) * light.color[1] * light.diffuse;
         float diffuseBlue = max(0.0, dot(direction, normalize(mat3(matWorld) * finalNormal))) * light.color[2] * light.diffuse;
         float attenuation = 1.0 / ( 0.0025 * distance * distance + 0.25);
-        float specularRed = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, finalNormal )))) ) ) * light.color[0] * light.specular;
-        float specularGreen = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, finalNormal )))) ) ) * light.color[1] * light.specular;
-        float specularBlue = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, finalNormal )))) ) ) * light.color[2] * light.specular;
+        float specularRed = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, normalize(mat3(matWorld) * finalNormal) )))) ) ) * light.color[0] * light.specular;
+        float specularGreen = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, normalize(mat3(matWorld) * finalNormal) )))) ) ) * light.color[1] * light.specular;
+        float specularBlue = exp(16.0 * log(max(0.0, dot(normalize(cameraView), normalize(reflect(-direction, normalize(mat3(matWorld) * finalNormal) )))) ) ) * light.color[2] * light.specular;
         vec3 diffuseLight = vec3(diffuseRed * attenuation, diffuseGreen * attenuation, diffuseBlue * attenuation);
         vec3 specularLight = vec3(specularRed * attenuation, specularGreen * attenuation, specularBlue * attenuation);        
         
@@ -568,25 +579,16 @@ void main() {
 
         JSCGL.matWorldUniform = JSCGL.gl.getUniformLocation(this.program, "matWorld");
         JSCGL.matFromEyeWorldUniform = JSCGL.gl.getUniformLocation(this.program, "matFromEyeWorld");
-        this.matViewProjUnifrom = JSCGL.gl.getUniformLocation(this.program, "matViewProj");
+        JSCGL.matViewProjUnifrom = JSCGL.gl.getUniformLocation(this.program, "matViewProj");
         JSCGL.invertNormalsUniform = JSCGL.gl.getUniformLocation(this.program, "invertNormals");
         JSCGL.numPointLightsUniform = JSCGL.gl.getUniformLocation(this.program, "numPointLights");
         JSCGL.cameraViewUniform = JSCGL.gl.getUniformLocation(this.program, "cameraView");
 
-        this.matView = Matrix3D.lookAt(
+        JSCGL.matView = Matrix3D.lookAt(
             Matrix3D.vec3fromValues(0, 0, 0),
             Matrix3D.vec3fromValues(0, 0, -1),
             Matrix3D.vec3fromValues(0, 1, 0));
-        this.matProj = Matrix3D.perspectiveMatrix(
-            Matrix3D.convertToRad(60),
-            this.width / this.height,
-            0.1, 1000.0
-        );
-        this.matViewProj = Matrix3D.multiplyMatrices(this.matProj, this.matView);
 
-        JSCGL.gl.uniformMatrix4fv(this.matViewProjUnifrom, false, this.matViewProj);
-
-        JSCGL.gl.viewport(0, 0, this.width, this.height);
         JSCGL.gl.enable(JSCGL.gl.DEPTH_TEST);
 
     }
@@ -802,16 +804,5 @@ void main() {
 
     updateDimensions(width, height) {
         JSCGL.gl.viewport(0 , 0, width, height);
-        this.matView = Matrix3D.lookAt(
-            Matrix3D.vec3fromValues(0, 0, 0),
-            Matrix3D.vec3fromValues(0, 0, -1),
-            Matrix3D.vec3fromValues(0, 1, 0));
-        this.matProj = Matrix3D.perspectiveMatrix(
-            Matrix3D.convertToRad(60),
-            this.width / this.height,
-            0.1, 1000.0
-        );
-        this.matViewProj = Matrix3D.multiplyMatrices(this.matProj, this.matView);
-        JSCGL.gl.uniformMatrix4fv(this.matViewProjUnifrom, false, this.matViewProj);
     }
 }
