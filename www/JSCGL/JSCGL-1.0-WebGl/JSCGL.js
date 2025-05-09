@@ -215,7 +215,7 @@ class Object3D {
         gl.uniform1f(this.invertNormalsUniform, inverted);
         gl.uniform3fv(this.cameraViewUniform, new Float32Array(eye));
         gl.uniform1i(this.numPointLightsUniform, pointLights.length);
-        for (i = 0; i < pointLights.length; i++) {
+        for (let i = 0; i < pointLights.length; i++) {
             let lightPointUniform = JSCGL.gl.getUniformLocation(this.program, "lightPoint["+i+"].position");
             let lightDiffuseUniform = JSCGL.gl.getUniformLocation(this.program, "lightPoint["+i+"].diffuse");
             let lightSpecularUniform = JSCGL.gl.getUniformLocation(this.program, "lightPoint["+i+"].specular");
