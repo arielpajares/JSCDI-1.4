@@ -1,0 +1,19 @@
+{
+    "src": {
+        "models": [{"model": "../../www/testScene/src/models/test.obj", "image": 2}, {"model": "../../www/testScene/src/models/light_bulb.obj", "image": 1}, {"model": "../../www/testScene/src/models/floor.obj", "image": 0}],
+        "images": ["testScene/src/images/black_marmle.jpg", "testScene/src/images/light_bulb.png", "testScene/src/images/white.jpg"]
+    },
+    "data": {
+        "objects": [
+        {"id": "bombilla", "model": 1, "position": [0, 5, 0], "scale": [7, 7, 7], "inverted": true},
+        {"id": "piso", "model": 2, "position": [0, -5, 0], "scale": [10, 10, 10]},
+        {"id": "test", "model": 0, "position": [0, 0, -3], "scale": [1, 1, 1]}
+        ],
+        "pointLights": [
+            {"id": "bombilla", "position": [0, 5, 0], "color": [1, 1, 1], "diffuseStrength": 0.4, "specularStrength": 0.4}
+        ],
+        "cameras": [
+            {"id": "camera00", "position": [0, 0, 20], "rotation": [0, 0, 0], "fov": 60, "active": false}
+        ]
+    }
+}
