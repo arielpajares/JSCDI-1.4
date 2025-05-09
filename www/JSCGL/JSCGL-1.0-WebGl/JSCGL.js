@@ -342,7 +342,7 @@ class Scene {
             let actualModel = this.sceneData.src.models[i];
             tempImage = await this.loadImageAsync(this.sceneData.src.images[actualModel.image]);
 
-            modelData.push(new Model(await fetchModel(actualModel.model, tempImage)));
+            modelData.push(new Model(await this.fetchModel(actualModel.model, tempImage)));
         }
         
         for (let i = 0; i < modelData.length; i++) {
@@ -451,14 +451,34 @@ class Scene {
         this.objects.shift();
     }
 
+    txtToArray(txt) {
+        let array = [];
+        let array1 = [];
+        let tempString = "";
+    
+        for (let i = 0; i < txt.length-1; i++) {
+            if (txt[i] == ',') {
+                array.push(parseFloat(tempString));
+                array1.push(tempString);
+                tempString = "";
+            }
+            else if (txt[i] != ' ' && txt[i] != '[' && txt[i] != ']' && txt[i] != '"') {
+                tempString += txt[i];
+            }
+        }
+        array.push(parseFloat(tempString)); 
+    
+        return array;
+    }
+
     async fetchModel(file, texture, indices) {
-        let response = await fetchPostResponse("getObjModel()", file);
+        let response = await this.fetchPostResponse("getObjModel()", file);
         let file_content = await response.text();
         if (indices) {
-            return [new Float32Array(txtToArray(file_content)), texture, indices];
+            return [new Float32Array(this.txtToArray(file_content)), texture, indices];
         }
         else {
-            return [new Float32Array(txtToArray(file_content)), texture];
+            return [new Float32Array(this.txtToArray(file_content)), texture];
         }
     }
 
