@@ -2,7 +2,7 @@ let sceneText;
 
 async function readFile() {
 
-    const reader = await fetch("webGlScene.json")
+    const reader = await fetch("testScene/webGlScene.json")
     sceneText = await reader.text();
     sceneText = JSON.parse(sceneText);
     
