@@ -1,11 +1,11 @@
-let testText;
+let sceneText;
 
 async function readFile() {
 
-    let response = await fetch("webGlScene.json");
-    testTxt = await response.text();
-    testTxt = JSON.parse(testTxt);
-
+    const reader = await fetch("webGlScene.json")
+    sceneText = await reader.text();
+    sceneText = JSON.parse(sceneText);
+    
 
     requestAnimationFrame(load);
 }
@@ -14,28 +14,30 @@ let load = async function () {
     const canvas = document.querySelector("canvas");
     const gl = canvas.getContext("webgl2");
 
+    let width;
+    let height;
+
     JSCGL.setGL(gl);
+    gl.disable(gl.CULL_FACE);
     const jgl = new JSCGL(width, height);
 
-    const testScene = new Scene();
-    const test1 = new Scene(testTxt);
-    await test1.loadScene(jgl);
-
-    width = innerWidth;
-    height = innerHeight;
+    const mainScene = new Scene(sceneText);
+    await mainScene.loadScene(jgl);
+    width = window.innerWidth;
+    height = window.innerHeight;
 
     canvas.width = width;
     canvas.height = height;
 
     jgl.updateDimensions(width, height);
 
-    testScene.newCamera([0, 0, 10], [0, 0, 0], true);
-
-    let cameras = testScene.cameras;
+    let cameras = mainScene.cameras;
     let camera = cameras[0];
 
+    let shapes = mainScene.objects;
+
     let angleX = 0;
-    let angleY = -10;
+    let angleY = 0;
     let mouseX = 0;
     let mouseY = 0;
 
@@ -87,38 +89,35 @@ let load = async function () {
         // Cube Move
 
         if (keysPressed['w'] == true) {
-            camera[0][0] -= sinCam * dt * 10;
-            camera[0][2] -= cosCam * dt * 10;
+            camera.position[0] -= sinCam * dt * 10;
+            camera.position[2] -= cosCam * dt * 10;
         }
 
         if (keysPressed['s'] == true) {
-            camera[0][0] += sinCam * dt * 10;
-            camera[0][2] += cosCam * dt * 10;
+            camera.position[0] += sinCam * dt * 10;
+            camera.position[2] += cosCam * dt * 10;
         }
 
         if (keysPressed['a'] == true) {
-            camera[0][0] -= Math.sin(Matrix3D.convertToRad(-angleX+90)) * dt * 10;
-            camera[0][2] -= Math.cos(Matrix3D.convertToRad(-angleX+90)) * dt * 10;
+            camera.position[0] -= Math.sin(Matrix3D.convertToRad(-angleX+90)) * dt * 10;
+            camera.position[2] -= Math.cos(Matrix3D.convertToRad(-angleX+90)) * dt * 10;
         }
 
         if (keysPressed['d'] == true) {
-            camera[0][0] += Math.sin(Matrix3D.convertToRad(-angleX+90)) * dt * 10;
-            camera[0][2] += Math.cos(Matrix3D.convertToRad(-angleX+90)) * dt * 10;
+            camera.position[0] += Math.sin(Matrix3D.convertToRad(-angleX+90)) * dt * 10;
+            camera.position[2] += Math.cos(Matrix3D.convertToRad(-angleX+90)) * dt * 10;
         }
 
-        camera[1][0] = 0;
-        camera[1][2] = Matrix3D.convertToRad(angleY);
-        camera[1][1] = Matrix3D.convertToRad(-angleX);
+        camera.rotation[2] = Matrix3D.convertToRad(angleY);
+        camera.rotation[1] = Matrix3D.convertToRad(-angleX);
 
         gl.clearColor(0.1, 0.1, 0.1, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        
-        JSCGL.setLightPosition(0, 5, 0);
 
         cameras[0] = camera;
-        testScene.returnScene({'objects': null, 'cameras': cameras});
+        mainScene.returnScene({'objects': shapes, 'cameras': cameras});
 
-        testScene.draw(JSCGL.gl, dt);
+        mainScene.draw(JSCGL.gl, dt, width, height);
 
         requestAnimationFrame(frame);
     }
