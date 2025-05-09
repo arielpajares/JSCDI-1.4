@@ -2,7 +2,7 @@ let testText;
 
 async function readFile() {
 
-    let response = await fetch("testing.json");
+    let response = await fetch("webGlScene.json");
     testTxt = await response.text();
     testTxt = JSON.parse(testTxt);
 
