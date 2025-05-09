@@ -305,7 +305,7 @@ class Model {
 
     autoIndices(shape) {
         let array_temp = [];
-        for (i = 0; i < shape.length/3; i++) {
+        for (let i = 0; i < shape.length/3; i++) {
             array_temp.push(i);
         }
         return new Uint16Array(array_temp);
