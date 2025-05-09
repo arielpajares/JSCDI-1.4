@@ -1,100 +1,38 @@
-function txtToArray(txt) {
-    let array = [];
-    let array1 = [];
-    let tempString = "";
-
-    for (i = 0; i < txt.length-1; i++) {
-        if (txt[i] == ',') {
-            array.push(parseFloat(tempString));
-            array1.push(tempString);
-            tempString = "";
-        }
-        else if (txt[i] != ' ' && txt[i] != '[' && txt[i] != ']' && txt[i] != '"') {
-            tempString += txt[i];
-        }
-    }
-    array.push(parseFloat(tempString)); 
-
-    return array;
-}
-
-async function fetchModel(file, texture, indices) {
-    let response = await fetchPostResponse("getObjModel()", file);
-    let file_content = await response.text();
-    if (indices) {
-        return [new Float32Array(txtToArray(file_content)), texture, indices];
-    }
-    else {
-        return [new Float32Array(txtToArray(file_content)), texture];
-    }
-}
-
-async function fetchPostResponse(func, file) {
-    while (true) {
-        try {
-            const response = await fetch(func, {
-                method: "POST",
-                body: file+","
-            });
-            if (response.ok) {
-                return response;
-            }
-        } catch {}
-    }
-}
-
+let testText;
 
 async function readFile() {
 
-    let marble = new Image();
-    let lightBulbTex = new Image();
+    let response = await fetch("testing.json");
+    testTxt = await response.text();
+    testTxt = JSON.parse(testTxt);
 
-    marble.src = "testScene/src/images/black_marmle.jpg";
-    lightBulbTex.src = "testScene/src/images/light_bulb.jpg";
-
-    testModel = new Model(await fetchModel("../../www/testScene/src/models/test.obj", lightBulbTex));
-    lightBulbModel = new Model(await fetchModel("../../www/testScene/src/models/light_bulb.obj", lightBulbTex));
-    floorModel = new Model(await fetchModel("../../www/testScene/src/models/floor.obj", marble));
 
     requestAnimationFrame(load);
 }
 
-let load = function () {
+let load = async function () {
     const canvas = document.querySelector("canvas");
     const gl = canvas.getContext("webgl2");
-
-    let width;
-    let height;
-
-    if (confirm("Would you like to specify canvas dimensions?")) {
-        width = parseInt(prompt("Insert width:"));
-        height = parseInt(prompt("Insert height:"));
-    }
-    else {
-        width = 800;
-        height = 600;
-    }
-
-    canvas.width = width;
-    canvas.height = height;
 
     JSCGL.setGL(gl);
     const jgl = new JSCGL(width, height);
 
     const testScene = new Scene();
+    const test1 = new Scene(testTxt);
+    await test1.loadScene(jgl);
 
-    const test = jgl.loadModel(testModel);
-    const floor = jgl.loadModel(floorModel);
-    const lightBulb = jgl.loadModel(lightBulbModel);
+    width = innerWidth;
+    height = innerHeight;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    jgl.updateDimensions(width, height);
 
     testScene.newCamera([0, 0, 10], [0, 0, 0], true);
 
     let cameras = testScene.cameras;
     let camera = cameras[0];
-
-    testScene.push(jgl.newObject(test, [0, 0, -3], [1, 1, 1]));
-    testScene.push(jgl.newObject(floor, [0, -5, 0], [10, 10, 10]));
-    testScene.push(jgl.newObject(lightBulb, [0, 5, 0], [7, 7, 7]), true);
 
     let angleX = 0;
     let angleY = -10;
