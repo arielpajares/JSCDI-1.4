@@ -284,6 +284,8 @@ class Scene {
     matViewProjBuffer;
     cameras;
     invertedObjects;
+    actualCamera;
+    pointLights;
 
     constructor(scene, matViewProjBuffer) {
         this.sceneData = scene;
