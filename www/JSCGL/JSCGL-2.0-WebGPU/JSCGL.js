@@ -510,6 +510,7 @@ class Scene {
     constructor(scene) {
         this.sceneData = scene;
         this.objects = [];
+        this.models = [];
         this.actualCamera = "camera00"
         this.pointLights = [];
         this.cameras = [];
