@@ -495,6 +495,7 @@ class Model {
 
 class Scene {
     objects;
+    models;
     sceneData;
     cameras;
     invertedObjects;
@@ -522,7 +523,6 @@ class Scene {
     async loadScene(jgl) {
         let fetchImage = new Image();
         let modelData = [];
-        let models = [];
         let objects = [];
         let pointLights = [];
         let invertedObjects = [];
@@ -551,13 +551,13 @@ class Scene {
             }
             
             for (let i = 0; i < modelData.length; i++) {
-                models.push(jgl.loadModel(modelData[i]));
+                this.models.push(jgl.loadModel(modelData[i]));
             }
 
             for (let i = 0; i < this.sceneData.data.objects.length; i++) {
                 let actualObject = this.sceneData.data.objects[i];
                 if (actualObject.type != "line") {
-                    objects.push(jgl.newObject({id: actualObject.id, model: models[actualObject.model], position: actualObject.position, size: actualObject.scale, velocity: actualObject.velocity, rotation: actualObject.rotation, inverted: actualObject.inverted}));
+                    objects.push(jgl.newObject({id: actualObject.id, model: this.models[actualObject.model], position: actualObject.position, size: actualObject.scale, velocity: actualObject.velocity, rotation: actualObject.rotation, inverted: actualObject.inverted}));
                 } else {   
                     objects.push(jgl.newLine({id: actualObject.id, type: actualObject.type, start: actualObject.start, end: actualObject.end, thickness: actualObject.thickness, color: actualObject.color}));
                 }
@@ -787,13 +787,23 @@ class Scene {
     getObjectById(id) {
         let searchedObject;
         this.objects.forEach(object => {
-            console.log(object.id, id, object.id == id);
             if (object.id == id) {
                 searchedObject = object
             }
         });
 
         return searchedObject;
+    }
+
+    getModelById(id) {
+        let searchedModel;
+        this.models.forEach(model => {
+            if (model.id == id) {
+                searchedModel = model;
+            }
+        })
+
+        return searchedModel;
     }
 
     push(object, inverted) {
