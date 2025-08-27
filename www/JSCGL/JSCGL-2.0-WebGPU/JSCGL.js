@@ -13,6 +13,55 @@ class Matrix3D {
         return result;
     }
 
+    static multiplyMatrixVector(matrix, vector) {
+        let result = [];
+        for (let row = 0; row < 4; row++) {
+            let sum = 0;
+            for (let i = 0; i < 4; i++) {
+                sum += matrix[row + i * 4] * vector[i];
+            }
+            result.push(sum);
+        }
+        return result;
+    }
+
+    static invertMatrix(m) {
+        const inv = new Float32Array(16);
+        const [
+            m00, m01, m02, m03,
+            m10, m11, m12, m13,
+            m20, m21, m22, m23,
+            m30, m31, m32, m33
+        ] = m;
+
+        inv[0] = m11*m22*m33 - m11*m23*m32 - m21*m12*m33 + m21*m13*m32 + m31*m12*m23 - m31*m13*m22;
+        inv[1] = -m01*m22*m33 + m01*m23*m32 + m21*m02*m33 - m21*m03*m32 - m31*m02*m23 + m31*m03*m22;
+        inv[2] = m01*m12*m33 - m01*m13*m32 - m11*m02*m33 + m11*m03*m32 + m31*m02*m13 - m31*m03*m12;
+        inv[3] = -m01*m12*m23 + m01*m13*m22 + m11*m02*m23 - m11*m03*m22 - m21*m02*m13 + m21*m03*m12;
+
+        inv[4] = -m10*m22*m33 + m10*m23*m32 + m20*m12*m33 - m20*m13*m32 - m30*m12*m23 + m30*m13*m22;
+        inv[5] = m00*m22*m33 - m00*m23*m32 - m20*m02*m33 + m20*m03*m32 + m30*m02*m23 - m30*m03*m22;
+        inv[6] = -m00*m12*m33 + m00*m13*m32 + m10*m02*m33 - m10*m03*m32 - m30*m02*m13 + m30*m03*m12;
+        inv[7] = m00*m12*m23 - m00*m13*m22 - m10*m02*m23 + m10*m03*m22 + m20*m02*m13 - m20*m03*m12;
+
+        inv[8] = m10*m21*m33 - m10*m23*m31 - m20*m11*m33 + m20*m13*m31 + m30*m11*m23 - m30*m13*m21;
+        inv[9] = -m00*m21*m33 + m00*m23*m31 + m20*m01*m33 - m20*m03*m31 - m30*m01*m23 + m30*m03*m21;
+        inv[10] = m00*m11*m33 - m00*m13*m31 - m10*m01*m33 + m10*m03*m31 + m30*m01*m13 - m30*m03*m11;
+        inv[11] = -m00*m11*m23 + m00*m13*m21 + m10*m01*m23 - m10*m03*m21 - m20*m01*m13 + m20*m03*m11;
+
+        inv[12] = -m10*m21*m32 + m10*m22*m31 + m20*m11*m32 - m20*m12*m31 - m30*m11*m22 + m30*m12*m21;
+        inv[13] = m00*m21*m32 - m00*m22*m31 - m20*m01*m32 + m20*m02*m31 + m30*m01*m22 - m30*m02*m21;
+        inv[14] = -m00*m11*m32 + m00*m12*m31 + m10*m01*m32 - m10*m02*m31 - m30*m01*m12 + m30*m02*m11;
+        inv[15] = m00*m11*m22 - m00*m12*m21 - m10*m01*m22 + m10*m02*m21 + m20*m01*m12 - m20*m02*m11;
+
+        // Determinante
+        const det = m00*inv[0] + m01*inv[4] + m02*inv[8] + m03*inv[12];
+        if (det === 0) return null;
+
+        for (let i = 0; i < 16; i++) inv[i] /= det;
+        return inv;
+    }
+
     static scaleMatrix(sx, sy, sz) {
         return new Float32Array([
             sx, 0,  0,  0,
@@ -118,7 +167,6 @@ class Matrix3D {
         ]);
     }
 
-    // Es ortografica pero está adaptada para evitar que los valores de z al multiplicarse por matWorld no salgan del clipspace
     static orthographicMatrix(left, right, bottom, top, near, far) {
         const lr = 1 / (left - right);
         const bt = 1 / (bottom - top);
@@ -293,7 +341,7 @@ class Object3D {
             @group(1) @binding(1) var<uniform> matFromEyeWorld: mat4x4<f32>;
             @group(1) @binding(2) var<uniform> matViewProj: mat4x4<f32>;
             @group(1) @binding(3) var<uniform> cameraView: vec3f;
-            @group(1) @binding(4) var<uniform> lightPoint: Array<PointLight, 8>;
+            @group(1) @binding(4) var<uniform> lightPoint: array<PointLight, 8>;
             @group(1) @binding(5) var<uniform> numPointLights: u32;
             @group(1) @binding(6) var<uniform> invertNormals: f32;
         */
@@ -419,6 +467,7 @@ class Model {
     vertices;
     indices;
     texture;
+    specularMap;
 
     constructor (model) {
         /*
@@ -432,6 +481,7 @@ class Model {
         //}
         this.vertices = model.vertexData;
         this.texture = model.textureData;
+        this.specularMap = model.specularMap;
     }
 
     autoIndices(vertices) {
@@ -446,7 +496,6 @@ class Model {
 class Scene {
     objects;
     sceneData;
-    matViewProjBuffer;
     cameras;
     invertedObjects;
     actualCamera;
@@ -454,8 +503,8 @@ class Scene {
 
     // Auxiliar Attributes
     matView;
+    matViewProj = Matrix3D.newMat4();
     matViewProjBuffer;
-    matViewOProjBuffer;
 
     constructor(scene) {
         this.sceneData = scene;
@@ -471,7 +520,7 @@ class Scene {
     }
 
     async loadScene(jgl) {
-        let tempImage = new Image();
+        let fetchImage = new Image();
         let modelData = [];
         let models = [];
         let objects = [];
@@ -484,12 +533,21 @@ class Scene {
 
         if (this.sceneData.src.models) {
             for (let i = 0; i < this.sceneData.src.models.length; i++) {
-                let actualModel = this.sceneData.src.models[i];
-                tempImage.src = this.sceneData.src.images[actualModel.image];
-                await tempImage.decode();
-                const tempImageBitmap = await createImageBitmap(tempImage);
+                const actualModel = this.sceneData.src.models[i];
+                let specularMapImageBitmap = null;
+                fetchImage.src = this.sceneData.src.images[actualModel.image];
+                await fetchImage.decode();
+                let textureImageBitmap = await createImageBitmap(fetchImage);
 
-                modelData.push(new Model(await this.fetchModel(actualModel.model, tempImageBitmap)));
+                if (this.sceneData.src.images[actualModel.specularMap]) {
+                    fetchImage.src = this.sceneData.src.images[actualModel.specularMap];
+                    await fetchImage.decode();
+                    specularMapImageBitmap = await createImageBitmap(fetchImage);
+                    modelData.push(new Model(await this.fetchModel(actualModel.model, textureImageBitmap, specularMapImageBitmap)));
+                } else {
+                    modelData.push(new Model(await this.fetchModel(actualModel.model, textureImageBitmap)));
+                }
+
             }
             
             for (let i = 0; i < modelData.length; i++) {
@@ -539,14 +597,14 @@ class Scene {
                 if (!camera.active) {
                     camera.active = true;
                     
-                    let matProj = Matrix3D.perspectiveMatrix(
+                    const matProj = Matrix3D.perspectiveMatrix(
                         Matrix3D.convertToRad(camera.fov),
                         width / height,
                         0.1, 1000.0
                     );
 
-                    let matViewProj = Matrix3D.multiplyMatrices(matProj, this.matView);
-                    this.matViewProjBuffer = jgl.createUniformBuffer(matViewProj);
+                    this.matViewProj = Matrix3D.multiplyMatrices(matProj, this.matView);
+                    this.matViewProjBuffer = jgl.createUniformBuffer(this.matViewProj);
                     break;
                 }
             }
@@ -559,7 +617,7 @@ class Scene {
             colorAttachments: [{
                 view: jgl.context.getCurrentTexture().createView(),
                 loadOp: "clear",
-                clearValue: [0.7,0.7,1,1],
+                clearValue: [BACKGROUND_COLOR[0], BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], BACKGROUND_COLOR[3]],
                 storeOp: "store"
             }],
             depthStencilAttachment: {
@@ -782,24 +840,19 @@ class Scene {
 
         return model;
     }
-
-    // Necesario cambiar esto de aquí cuando adaptemos el servidor a PHP
-
-    async fetchModel(file, texture, indices) {
+    
+    async fetchModel(file, texture, specularMap, indices) {
         let response = await this.fetchPostResponse(file);
         if (indices) {
-            return {vertexData: new Float32Array(response), textureData: texture, indices: indices};
+            return {vertexData: new Float32Array(response), textureData: texture, specularMap: specularMap, indices: indices};
         }
         else {
-            return {vertexData: new Float32Array(response), textureData: texture};
+            return {vertexData: new Float32Array(response), textureData: texture, specularMap: specularMap};
         }
     }
 
     async fetchPostResponse(file) {
-        const response = await fetch(file, {
-            method: "POST",
-            body: file+","
-        }).then(async function (response) {
+        const response = await fetch(file).then(async function (response) {
             return response.text();
         });
         
@@ -847,9 +900,10 @@ class JSCGL {
             struct VertexOut {
                 @builtin(position) position: vec4f,
                 @location(0) uvCoords: vec2f,
-                @location(1) brightness: vec3f,
-                @location(2) depth: f32,
-                @location(3) shadowUv: vec2f
+                @location(1) diffuse: vec3f,
+                @location(2) specular: vec3f,
+                @location(3) depth: f32,
+                @location(4) shadowUv: vec2f
             }
             
             struct LineVertexOut {
@@ -872,6 +926,8 @@ class JSCGL {
 
             @group(0) @binding(0) var sampler1: sampler;
             @group(0) @binding(1) var texture1: texture_2d<f32>;
+            @group(0) @binding(2) var specularSampler: sampler;
+            @group(0) @binding(3) var specularMap: texture_2d<f32>;
             
             @group(1) @binding(0) var<uniform> matWorld: mat4x4<f32>;
             @group(1) @binding(1) var<uniform> matFromEyeWorld: mat4x4<f32>;
@@ -889,7 +945,7 @@ class JSCGL {
             @group(3) @binding(0) var depthSample: sampler_comparison;
             @group(3) @binding(1) var depthTexture: texture_depth_2d;
 
-            fn pointLightCalculation(light: PointLight, numPointLights: u32, finalNormal: vec3f, matWorld: mat3x3<f32>, vertWorldPosition: vec4f, cameraView: vec3f) -> vec3f {
+            fn pointLightCalculation(light: PointLight, numPointLights: u32, finalNormal: vec3f, matWorld: mat3x3<f32>, vertWorldPosition: vec4f, cameraView: vec3f) -> array<vec3f, 2> {
                 let lightPoint = vec3f(light.position[0], light.position[1], light.position[2]);
                 let offset = lightPoint - vec3f(vertWorldPosition[0], vertWorldPosition[1], vertWorldPosition[2]);
                 let distance = length(offset);
@@ -908,10 +964,10 @@ class JSCGL {
                 let diffuseLight = vec3f(diffuseRed * attenuation, diffuseGreen * attenuation, diffuseBlue * attenuation);
                 let specularLight = vec3f(specularRed * attenuation, specularGreen * attenuation, specularBlue * attenuation);        
                 
-                return specularLight + diffuseLight;
+                return array(specularLight, diffuseLight);
             }
             
-            fn directionalLightCalculation(light: PointLight, finalNormal: vec3f, matWorld: mat3x3<f32>, vertWorldPosition: vec4f, cameraView: vec3f) -> vec3f {
+            fn directionalLightCalculation(light: PointLight, finalNormal: vec3f, matWorld: mat3x3<f32>, vertWorldPosition: vec4f, cameraView: vec3f) -> array<vec3f, 2> {
                 let lightPoint = vec3f(light.position[0], light.position[1], light.position[2]);
                 let offset = lightPoint - vec3f(vertWorldPosition[0], vertWorldPosition[1], vertWorldPosition[2]);
                 let direction = normalize(lightPoint);
@@ -928,7 +984,7 @@ class JSCGL {
                 let specularLight = vec3f(specularRed, specularGreen, specularBlue);
                 let diffuseLight = vec3f(diffuseRed, diffuseGreen, diffuseBlue);
 
-                return specularLight + diffuseLight;
+                return array(specularLight, diffuseLight);
             }
     
             @vertex
@@ -937,9 +993,10 @@ class JSCGL {
                 let finalNormal = vec3f(normal[0] * invertNormals, normal[1] * invertNormals, normal[2] * invertNormals);
                 let vertWorldPosition = matWorld * vec4f(vertPosition, 1.0);
 
-                let directionalLight = PointLight(vec3f(0, 1, 0), vec3f(1, 1, 1), 0.5, 0);
+                let directionalLight = PointLight(vec3f(0, 1, 0), vec3f(1, 1, 1), 0.45, 0.5);
 
-                out.brightness = vec3f(0, 0, 0);
+                out.diffuse = vec3f(0, 0, 0);
+                out.specular = vec3f(0, 0, 0);
                 let normalMatrix: mat3x3<f32> = mat3x3<f32>(
                     matWorld[0].xyz,
                     matWorld[1].xyz,
@@ -947,10 +1004,14 @@ class JSCGL {
                 );
 
                 for (var i: u32 = 0; i < numPointLights; i += 1) {
-                    out.brightness += pointLightCalculation(lightPoint[i], numPointLights, finalNormal, normalMatrix, vertWorldPosition, cameraView);
+                    var calculation = pointLightCalculation(lightPoint[i], numPointLights, finalNormal, normalMatrix, vertWorldPosition, cameraView);
+                    out.diffuse += calculation[1];
+                    out.specular += calculation[0];
                 }
                 
-                out.brightness += directionalLightCalculation(directionalLight, finalNormal, normalMatrix, vertWorldPosition, cameraView);
+                var calculation = directionalLightCalculation(directionalLight, finalNormal, normalMatrix, vertWorldPosition, cameraView);
+                out.diffuse += calculation[1];
+                out.specular += calculation[0];
                 
                 out.position = matViewProj * matFromEyeWorld * vec4f(vertPosition, 1);
                 out.uvCoords = uvCoords;
@@ -1004,9 +1065,11 @@ class JSCGL {
             }
     
             @fragment
-            fn fragmentShader1(@location(0) uvCoords: vec2f, @location(1) brightness: vec3f, @location(2) depth: f32, @location(3) shadowUv: vec2f) -> @location(0) vec4f {
+            fn fragmentShader1(@location(0) uvCoords: vec2f, @location(1) diffuse: vec3f, @location(2) specular: vec3f, @location(3) depth: f32, @location(4) shadowUv: vec2f) -> @location(0) vec4f {
                 var visibility: f32;
                 let textureColor = textureSample(texture1, sampler1, uvCoords);
+                let specularMap = textureSample(specularMap, specularSampler, uvCoords);
+
                 visibility = textureSampleCompare(depthTexture, depthSample, shadowUv, depth);
                 let texSize = vec2<f32>(textureDimensions(depthTexture));
                 let uv = shadowUv;
@@ -1017,9 +1080,9 @@ class JSCGL {
                 let textureGreen = textureColor.g;
                 let textureBlue = textureColor.b;
 
-                let red = (textureRed * 0.6) + (textureRed * brightness[0]);
-                let green = (textureGreen * 0.6) + (textureGreen * brightness[1]);
-                let blue = (textureBlue * 0.6) + (textureBlue * brightness[2]);
+                let red = (textureRed * 0.6) + (textureRed * (diffuse[0] + (specular[0] * specularMap.r)));
+                let green = (textureGreen * 0.6) + (textureGreen * (diffuse[1] + (specular[1] * specularMap.g)));
+                let blue = (textureBlue * 0.6) + (textureBlue * (diffuse[2] + (specular[2] * specularMap.b)));
                 return vec4f(red, green, blue, textureColor.a);
             }
     
@@ -1090,7 +1153,9 @@ class JSCGL {
         ]});
         const texGroupLayout = this.device.createBindGroupLayout({label: "Tex Layout", entries: [
             {binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {type: "filtering"}},
-            {binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {sampleType: "float", viewDimension: "2d", multisampled: false}}
+            {binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {sampleType: "float", viewDimension: "2d", multisampled: false}},
+            {binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: {type: "filtering"}},
+            {binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: {sampleType: "float", viewDimension: "2d", multisampled: false}}
         ]});
 
         const depthTexLayout = this.device.createBindGroupLayout({label: "Depth Texture Layout", entries: [
@@ -1207,7 +1272,13 @@ class JSCGL {
 
     loadModel(model) {
         const textureBuffer = this.createTexture(model.texture);
-        const textureBindGroup = this.createTextureBindGroup(textureBuffer);
+        let specularMap;
+        if (model.specularMap) {
+            specularMap = this.createTexture(model.specularMap);
+        } else {
+            specularMap = this.createDefaultSpecularMap();
+        }            
+        const textureBindGroup = this.createTextureBindGroup(textureBuffer, specularMap);
         const vertexBuffer = this.createVertexBuffer(model.vertices);
 
         return {vertexBuffer: vertexBuffer, textureBindGroup: textureBindGroup, indices: model.indices, vertices: model.vertices.length/8};
@@ -1292,7 +1363,42 @@ class JSCGL {
         return {texture: texture, sampler: sampler};
     }
 
-    createTextureBindGroup(texture, id) {
+    createDefaultSpecularMap(linear) {
+        if (typeof linear == "undefined" || typeof linear == "null") {
+            linear = true;
+        }
+
+        let sampler;
+        let textureSize = { width: 1, height: 1 };
+        let blackColor = new Uint8Array([0, 0, 0, 255]);
+
+        let texture = this.device.createTexture({
+            size: textureSize,
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING
+        });
+
+        this.device.queue.writeTexture(
+            { texture: texture },
+            blackColor,
+            { bytesPerRow: 4 },
+            textureSize
+        );
+
+        if (linear) {
+            sampler = this.device.createSampler({
+                minFilter: "linear",
+                magFilter: "linear"
+            });
+        }
+        else {
+            sampler = this.device.createSampler();
+        }
+
+        return { texture: texture, sampler: sampler };
+    }
+
+    createTextureBindGroup(texture, specularMap, id) {
 
         // Change If necessary
         if (typeof id == "undefined" || typeof id == "null") {
@@ -1304,6 +1410,8 @@ class JSCGL {
             entries: [
               { binding: 0, resource: texture.sampler },
               { binding: 1, resource: texture.texture.createView() },
+              { binding: 2, resource: specularMap.sampler },
+              { binding: 3, resource: specularMap.texture.createView() }
             ]
         });
 
