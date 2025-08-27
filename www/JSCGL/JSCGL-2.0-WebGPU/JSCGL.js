@@ -760,6 +760,8 @@ class Scene {
         this.cameras.push([position, rotation, active]);
     }
 
+    /*
+    Binary Search future implementation
     getObjectById(id) {
         let first = 0;
         let last = this.objects.length - 1;
@@ -779,6 +781,19 @@ class Scene {
             }
         }
         return false;
+    }
+    */
+
+    getObjectById(id) {
+        let searchedObject;
+        this.objects.forEach(object => {
+            console.log(object.id, id, object.id == id);
+            if (object.id == id) {
+                searchedObject = object
+            }
+        });
+
+        return searchedObject;
     }
 
     push(object, inverted) {
