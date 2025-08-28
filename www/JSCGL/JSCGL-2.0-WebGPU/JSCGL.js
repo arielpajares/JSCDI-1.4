@@ -544,21 +544,21 @@ class Scene {
                     fetchImage.src = this.sceneData.src.images[actualModel.specularMap];
                     await fetchImage.decode();
                     specularMapImageBitmap = await createImageBitmap(fetchImage);
-                    modelData.push(new Model(await this.fetchModel(actualModel.model, textureImageBitmap, specularMapImageBitmap)));
+                    modelData.push({id: actualModel.id, model: new Model(await this.fetchModel(actualModel.model, textureImageBitmap, specularMapImageBitmap))});
                 } else {
-                    modelData.push(new Model(await this.fetchModel(actualModel.model, textureImageBitmap)));
+                    modelData.push({id: actualModel.id, model: new Model(await this.fetchModel(actualModel.model, textureImageBitmap))});
                 }
 
             }
             
             for (let i = 0; i < modelData.length; i++) {
-                this.models.push(jgl.loadModel(modelData[i]));
+                this.models.push({id: modelData[i].id, model: jgl.loadModel(modelData[i].model)});
             }
 
             for (let i = 0; i < this.sceneData.data.objects.length; i++) {
                 let actualObject = this.sceneData.data.objects[i];
                 if (actualObject.type != "line") {
-                    objects.push(jgl.newObject({id: actualObject.id, model: this.models[actualObject.model], position: actualObject.position, size: actualObject.scale, velocity: actualObject.velocity, rotation: actualObject.rotation, inverted: actualObject.inverted}));
+                    objects.push(jgl.newObject({id: actualObject.id, model: this.models[actualObject.model].model, position: actualObject.position, size: actualObject.scale, velocity: actualObject.velocity, rotation: actualObject.rotation, inverted: actualObject.inverted}));
                 } else {   
                     objects.push(jgl.newLine({id: actualObject.id, type: actualObject.type, start: actualObject.start, end: actualObject.end, thickness: actualObject.thickness, color: actualObject.color}));
                 }
