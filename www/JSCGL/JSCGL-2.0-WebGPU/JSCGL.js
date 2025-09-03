@@ -501,6 +501,7 @@ class Scene {
     invertedObjects;
     actualCamera;
     pointLights;
+    textures;
 
     // Auxiliar Attributes
     matView;
@@ -511,6 +512,7 @@ class Scene {
         this.sceneData = scene;
         this.objects = [];
         this.models = [];
+        this.textures = [];
         this.actualCamera = "camera00"
         this.pointLights = [];
         this.cameras = [];
@@ -539,11 +541,13 @@ class Scene {
                 fetchImage.src = this.sceneData.src.images[actualModel.image];
                 await fetchImage.decode();
                 let textureImageBitmap = await createImageBitmap(fetchImage);
+                this.textures.push({id: actualModel.id, ImageBitmap: textureImageBitmap});
 
                 if (this.sceneData.src.images[actualModel.specularMap]) {
                     fetchImage.src = this.sceneData.src.images[actualModel.specularMap];
                     await fetchImage.decode();
                     specularMapImageBitmap = await createImageBitmap(fetchImage);
+                    this.textures.push({id: actualModel.id, ImageBitmap: specularMapImageBitmap});
                     modelData.push({id: actualModel.id, model: new Model(await this.fetchModel(actualModel.model, textureImageBitmap, specularMapImageBitmap))});
                 } else {
                     modelData.push({id: actualModel.id, model: new Model(await this.fetchModel(actualModel.model, textureImageBitmap))});
@@ -1019,7 +1023,7 @@ class JSCGL {
                 let finalNormal = vec3f(normal[0] * invertNormals, normal[1] * invertNormals, normal[2] * invertNormals);
                 let vertWorldPosition = matWorld * vec4f(vertPosition, 1.0);
 
-                let directionalLight = PointLight(vec3f(0, 1, 0), vec3f(1, 1, 1), 0.45, 0.5);
+                let directionalLight = PointLight(vec3f(0, 1, 0), vec3f(1, 1, 1), 0.5, 0.5);
 
                 out.diffuse = vec3f(0, 0, 0);
                 out.specular = vec3f(0, 0, 0);
